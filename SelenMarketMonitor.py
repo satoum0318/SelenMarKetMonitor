@@ -2,7 +2,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import yfinance as yf
 import os
-import datetime
 
 st.set_page_config(layout="wide")
 st.title("セレン・マーケットモニター：IVクラッシュと債券トリガー可視化アプリ")
@@ -64,25 +63,32 @@ with col2:
 st.markdown("---")
 
 # =====================
-# データ取得
+# データ取得（try-exceptで保護）
 # =====================
 
-# USDJPY 取得
-usdjpy = yf.Ticker("JPY=X").history(period="1d")
-latest_usdjpy = float(usdjpy['Close'].iloc[-1])
-
-# Nikkei225 現値と前日比
-nikkei_hist = yf.Ticker("^N225").history(period="2d")
-nikkei_today = float(nikkei_hist['Close'].iloc[-1])
-nikkei_prev  = float(nikkei_hist['Close'].iloc[-2])
-nikkei_change_pct = (nikkei_today - nikkei_prev) / nikkei_prev * 100
-
-# JPVIX 取得トライ（なければ None）
 try:
-    jpvix = yf.Ticker("JPVIX").history(period="1d")
-    latest_vix = float(jpvix['Close'].iloc[-1])
+    usdjpy = yf.Ticker("JPY=X").history(period="1d")
+    latest_usdjpy = float(usdjpy['Close'].iloc[-1])
+except Exception:
+    latest_usdjpy = None
+
+try:
+    nikkei_hist = yf.Ticker("^N225").history(period="2d")
+    nikkei_today = float(nikkei_hist['Close'].iloc[-1])
+    nikkei_prev  = float(nikkei_hist['Close'].iloc[-2])
+    nikkei_change_pct = (nikkei_today - nikkei_prev) / nikkei_prev * 100
+except Exception:
+    nikkei_today = None
+    nikkei_change_pct = None
+
+# 米VIX代替
+try:
+    vix = yf.Ticker("^VIX").history(period="1d")
+    latest_vix = float(vix['Close'].iloc[-1])
+    vix_source = "米VIX（代替）"
 except Exception:
     latest_vix = None
+    vix_source = "VIX取得失敗"
 
 # =====================
 # アラートセクション
@@ -91,25 +97,30 @@ except Exception:
 st.markdown("### 🔔 トリガーアラート")
 
 # 1) C44000 売り発動通知
-if nikkei_today > 37500:
+if nikkei_today is not None and nikkei_today > 37500:
     st.warning(f"【要アクション】日経先物想定値が 37,500 を超過（指数終値 {nikkei_today:,.0f}） → 8月C44000 を1枚ショート検討！")
-else:
+elif nikkei_today is not None:
     st.info(f"日経225 : {nikkei_today:,.0f}（終値基準 37,500 未満）")
+else:
+    st.info("日経平均のデータ取得に失敗しました。")
 
 # 2) プット利確通知
 if latest_vix is not None:
     if latest_vix < 22:
-        st.warning(f"【IVクラッシュ注意】日経VI 推定値 {latest_vix:.1f} < 22 → プット利確を検討！")
+        st.warning(f"【IVクラッシュ注意】{vix_source} 推定値 {latest_vix:.1f} < 22 → プット利確を検討！")
     else:
-        st.success(f"日経VI 推定値 : {latest_vix:.1f}（22 以上／保有継続）")
+        st.success(f"{vix_source} 推定値 : {latest_vix:.1f}（22 以上／保有継続）")
 else:
-    st.info("日経VI データが取得できませんでした。手動でご確認ください。")
+    st.info("VIX データが取得できませんでした。手動でご確認ください。")
 
 # 3) 再ヘッジ通知
-if (latest_usdjpy < 140) and (nikkei_change_pct <= -2):
-    st.error(f"【ヘッジ提案】USDJPY {latest_usdjpy:.2f} < 140 かつ 日経▲{abs(nikkei_change_pct):.1f}% → プット買い戻しを検討！")
+if latest_usdjpy is not None and nikkei_change_pct is not None:
+    if (latest_usdjpy < 140) and (nikkei_change_pct <= -2):
+        st.error(f"【ヘッジ提案】USDJPY {latest_usdjpy:.2f} < 140 かつ 日経▲{abs(nikkei_change_pct):.1f}% → プット買い戻しを検討！")
+    else:
+        st.success(f"USDJPY : {latest_usdjpy:.2f} ／ 日経変動 {nikkei_change_pct:+.2f}%")
 else:
-    st.success(f"USDJPY : {latest_usdjpy:.2f} ／ 日経変動 {nikkei_change_pct:+.2f}%")
+    st.info("為替や日経の変動データが取得できませんでした。")
 
 st.markdown("---")
 
