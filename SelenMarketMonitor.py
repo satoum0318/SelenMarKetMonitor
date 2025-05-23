@@ -60,7 +60,32 @@ with col2:
     '''
     components.html(usd_widget, height=430)
 
+# Nikkei Futures Chart
+st.markdown("### 日経225先物チャート")
+nikkei_fut_widget = '''
+<div class="tradingview-widget-container">
+  <div id="tradingview_nikkei"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+  <script type="text/javascript">
+  new TradingView.widget({
+    "width": "100%",
+    "height": 400,
+    "symbol": "OSE:NK2251!",
+    "interval": "D",
+    "timezone": "Asia/Tokyo",
+    "theme": "light",
+    "style": "1",
+    "locale": "ja",
+    "toolbar_bg": "#f1f3f6",
+    "container_id": "tradingview_nikkei"
+  });
+  </script>
+</div>
+'''
+components.html(nikkei_fut_widget, height=430)
+
 st.markdown("---")
+
 
 # =====================
 # データ取得（try-exceptで保護）
